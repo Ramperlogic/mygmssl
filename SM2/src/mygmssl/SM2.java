@@ -15,7 +15,7 @@ import org.bouncycastle.math.ec.ECPoint;
 public class SM2 {
 	
 	private static ECPoint G;
-	private boolean debug = true;
+	private static boolean debug = true;
 	private  ECCurve.Fp curve;
 	private static final int DIGEST_LENGTH = 32;
 	
@@ -39,7 +39,7 @@ public class SM2 {
 		G = curve.createPoint(gx, gy ,false);
 		ecc_bc_spec = new ECDomainParameters(curve, G, n);
 	}
-	private boolean checkPublicKey(ECPoint publicKey) {
+	private static boolean checkPublicKey(ECPoint publicKey) {
 
 		if (!publicKey.isInfinity()) {
 
@@ -66,7 +66,7 @@ public class SM2 {
 		return false;
 	}
 	
-	private boolean between(BigInteger param, BigInteger min, BigInteger max) {
+	private static boolean between(BigInteger param, BigInteger min, BigInteger max) {
 		if (param.compareTo(min) >= 0 && param.compareTo(max) < 0) {
 			return true;
 		} else {
@@ -169,7 +169,7 @@ public class SM2 {
 		}
 	}
 
-	public byte[] encode(String input, ECPoint publicKey){
+	public byte[] encode(String input, ECPoint privateKey){
 		byte[] inputBuffer = input.getBytes();
 		if(debug)
 		{
@@ -189,7 +189,7 @@ public class SM2 {
     	BigInteger k = randomgenerator(n);//
     	if(debug)
     	{
-    		System.out.print("k = ");
+    		System.out.print("k  = ");
 			printHexString(k.toByteArray());
     	}
     	//A2:计算椭圆曲线点C1=[k]G=(x1,y1)，将C1的数据类型转换为比特串；
@@ -203,17 +203,22 @@ public class SM2 {
     	//A3:计算椭圆曲线点S=[h]PB，若s是无穷远点，则报错并退出；
 		BigInteger h = ecc_bc_spec.getH();
 		if (h != null) {
-			ECPoint S =  publicKey.multiply(h);//multiply(h);
+			ECPoint S =  privateKey.multiply(h);//multiply(h);
 			if (S.isInfinity())
 				throw new IllegalStateException();
 		}
 		
     	//A4:计算椭圆曲线点[k]Pb=(x2,y2)，将坐标x2,y2的数据类型转换为比特串；
-		kpb =  publicKey.multiply(k);//
+		kpb =  privateKey.multiply(k);//
     	byte[] kpbBytes =  kpb.getEncoded();
     	
     	//A5:计算t=KDF(x2||y2，klen)，若t为全0比特串，则返回A1；
 		t = KDF(kpbBytes, klen);
+		if(debug)
+		{
+			System.out.print("t  = ");
+			printHexString(t);
+		}
 	}while(allZero(t));
 		
     	//A6:计算C2=M ⊕ t；异或,M明文
@@ -245,18 +250,19 @@ public class SM2 {
 		return encodeResult;
 	}
 	
-	public String decode(byte[] encodeData, BigInteger privateKey) {
-		
-		byte[] C1Byte= new byte[65];
-		System.arraycopy(encodeData, 0, C1Byte, 0, C1Byte.length);
-
-		ECPoint C1 = curve.decodePoint(C1Byte);
+	public String decode(byte[] encodeData, BigInteger publicKey) {
 		
 		//B1:从C中取出比特串C1，将C1的数据类型转换为椭圆曲线上的点，验证C1是否满足椭圆曲线方程，若不满足则报错并退出；
+		byte[] C1Byte= new byte[65];
+		System.arraycopy(encodeData, 0, C1Byte, 0, C1Byte.length);
+		ECPoint C1 = curve.decodePoint(C1Byte);
 		byte[] C1Buffer;
 		C1Buffer =  C1.getEncoded();
-		System.out.print("C1 = ");
-		printHexString(C1Buffer);
+		if(debug)
+		{
+			System.out.print("C1 = ");
+			printHexString(C1Buffer);
+		}
 		
 		
 		//B2:计算椭圆曲线点S=[h]C1，若S是无穷远点，则报错并退出；
@@ -269,26 +275,28 @@ public class SM2 {
 		
 		
 		//B3:计算[db]C1=(x2，y2)，将坐标x2，y2的数据类型转换为比特串；
-		ECPoint dBC1 = C1.multiply(privateKey);
+		ECPoint dBC1 = C1.multiply(publicKey);
 		byte[] dBC1Bytes = dBC1.getEncoded();
 		
 		
 		//B4:计算t=KDF(x2||y2,klen)，若t为全0比特串，则报错并退出；
 		int klen = encodeData.length - 65 - DIGEST_LENGTH;
 		byte[] t = KDF(dBC1Bytes, klen);
-		
+		if(debug)
+		{
+			System.out.print("t  = ");
+			printHexString(t);
+		}
 		
 		//B5:从C中取出比特串C2，计算M'=C2⊕t；
 		byte[] M = new byte[klen];
 		byte[] C2 = new byte[30];
-		System.arraycopy(encodeData, 65, C2, 0, 30);
+		System.arraycopy(encodeData, 65, C2, 0, klen);
 		for (int i = 0; i < M.length; i++) {
 			M[i] = (byte) ( C2[i]^ t[i]);//encodeData[C1Byte.length + i]
 		}
 		if(debug)
 		{
-			
-			
 			System.out.print("C2 = ");
 			printHexString(C2);
 			System.out.print("M' = ");
@@ -330,18 +338,23 @@ public class SM2 {
 		SM2 sm2 = new SM2();
 		BigInteger px = new BigInteger("0AE4C779 8AA0F119 471BEE11 825BE462 02BB79E2 A5844495 E97C04FF 4DF2548A".replace(" ", ""), 16);
 		BigInteger py = new BigInteger("7C0240F8 8F1CD4E1 6352A73C 17B7F16F 07353E53 A176D684 A9FE0C6B B798E857".replace(" ", ""), 16);
-		ECPoint publicKey = sm2.curve.createPoint(px,py,true);
-		 BigInteger privateKey = new BigInteger("128B2FA8 BD433C6C 068C8D80 3DFF7979 2A519A55 171B1B65 0C23661D 15897263".replace(" ", ""), 16);
-		
-		System.out.println("publicKey:" + publicKey);
+		ECPoint privateKey = sm2.curve.createPoint(px,py,true);
+		BigInteger publicKey = new BigInteger("128B2FA8 BD433C6C 068C8D80 3DFF7979 2A519A55 171B1B65 0C23661D 15897263".replace(" ", ""), 16);
+		System.out.println("privateKey = " + privateKey);
+		System.out.println("publicKey = " + publicKey);
+	if(checkPublicKey(privateKey)==false)
+			System.err.println("错误：此非正确的公钥");
+	else
+	{
 		System.out.println("-----------------公钥加密-----------------");
 		
 		
-		byte[] data = sm2.encode("测试加密aaaaaaaaaaa123aabb", publicKey);
+		byte[] data = sm2.encode("测试加密aaaaaaaaaaa123aabb", privateKey);
 		System.out.print("密文 = ");
 		SM2.printHexString(data);
 		System.out.println("-----------------公钥解密-----------------");
-		System.out.println("解密后明文:" + sm2.decode(data, privateKey));
+		System.out.println("解密后明文:" + sm2.decode(data, publicKey));
+	}
 	}
 
 	
