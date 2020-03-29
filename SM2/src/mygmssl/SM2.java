@@ -160,16 +160,16 @@ public class SM2 {
 
 		if (checkPublicKey(keyPair.getPublicKey())) {
 			if (debug)
-				System.out.println("generate key successfully");
+				System.out.println("密钥对生成成功！");
 			return keyPair;
 		} else {
 			if (debug)
-				System.err.println("generate key failed");
+				System.err.println("失败");
 			return null;
 		}
 	}
 
-	public byte[] encode(String input, ECPoint privateKey){
+	public byte[] encode(String input, ECPoint publicKey){
 		byte[] inputBuffer = input.getBytes();
 		if(debug)
 		{
@@ -203,13 +203,13 @@ public class SM2 {
     	//A3:计算椭圆曲线点S=[h]PB，若s是无穷远点，则报错并退出；
 		BigInteger h = ecc_bc_spec.getH();
 		if (h != null) {
-			ECPoint S =  privateKey.multiply(h);//multiply(h);
+			ECPoint S =  publicKey.multiply(h);//multiply(h);
 			if (S.isInfinity())
 				throw new IllegalStateException();
 		}
 		
     	//A4:计算椭圆曲线点[k]Pb=(x2,y2)，将坐标x2,y2的数据类型转换为比特串；
-		kpb =  privateKey.multiply(k);//
+		kpb =  publicKey.multiply(k);//
     	byte[] kpbBytes =  kpb.getEncoded();
     	
     	//A5:计算t=KDF(x2||y2，klen)，若t为全0比特串，则返回A1；
@@ -250,7 +250,7 @@ public class SM2 {
 		return encodeResult;
 	}
 	
-	public String decode(byte[] encodeData, BigInteger publicKey) {
+	public String decode(byte[] encodeData, BigInteger privateKey) {
 		
 		//B1:从C中取出比特串C1，将C1的数据类型转换为椭圆曲线上的点，验证C1是否满足椭圆曲线方程，若不满足则报错并退出；
 		byte[] C1Byte= new byte[65];
@@ -275,7 +275,7 @@ public class SM2 {
 		
 		
 		//B3:计算[db]C1=(x2，y2)，将坐标x2，y2的数据类型转换为比特串；
-		ECPoint dBC1 = C1.multiply(publicKey);
+		ECPoint dBC1 = C1.multiply(privateKey);
 		byte[] dBC1Bytes = dBC1.getEncoded();
 		
 		
@@ -336,25 +336,21 @@ public class SM2 {
 		System.out.println("-----------------密钥生成-----------------");
 		 // 用户自己主私钥,用户自己设置
 		SM2 sm2 = new SM2();
-		BigInteger px = new BigInteger("0AE4C779 8AA0F119 471BEE11 825BE462 02BB79E2 A5844495 E97C04FF 4DF2548A".replace(" ", ""), 16);
-		BigInteger py = new BigInteger("7C0240F8 8F1CD4E1 6352A73C 17B7F16F 07353E53 A176D684 A9FE0C6B B798E857".replace(" ", ""), 16);
-		ECPoint privateKey = sm2.curve.createPoint(px,py,true);
-		BigInteger publicKey = new BigInteger("128B2FA8 BD433C6C 068C8D80 3DFF7979 2A519A55 171B1B65 0C23661D 15897263".replace(" ", ""), 16);
+		SM2KeyPair keyPair = sm2.generateKeyPair();
+		ECPoint publicKey = keyPair.getPublicKey();
+		BigInteger privateKey = keyPair.getPrivateKey();
+	
 		System.out.println("privateKey = " + privateKey);
 		System.out.println("publicKey = " + publicKey);
-	if(checkPublicKey(privateKey)==false)
-			System.err.println("错误：此非正确的公钥");
-	else
-	{
 		System.out.println("-----------------公钥加密-----------------");
 		
 		
-		byte[] data = sm2.encode("测试加密aaaaaaaaaaa123aabb", privateKey);
+		byte[] data = sm2.encode("测试加密aaaaaaaaaaa123aabb", publicKey);
 		System.out.print("密文 = ");
 		SM2.printHexString(data);
-		System.out.println("-----------------公钥解密-----------------");
-		System.out.println("解密后明文:" + sm2.decode(data, publicKey));
-	}
+		System.out.println("-----------------私钥解密-----------------");
+		System.out.println("解密后明文:" + sm2.decode(data, privateKey));
+	
 	}
 
 	
