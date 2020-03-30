@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
+import java.security.*;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -65,7 +66,22 @@ public class SM2 {
 		}
 		return false;
 	}
-	
+	private static byte[] ZA(String IDA, ECPoint PublicKey) {
+		/*
+		 	SM2数字签名算法中，作为签名者的用户A的密钥对包括其私钥dA和公钥PA=[dA]G=(xA，yA)，
+			用户A具有位长为entlenA的可辨别标识IDA，记ENTLA是由整数entlenA转换而成的2B
+			数据，签名者和验证者都需要用密码杂凑算法求得用户A的杂凑值
+			ZA=H256(ENTLA||IDA||a||b||xG||yG||xA||yA)．SM2数字签名算法规定H256为
+			SM3密码杂凑算法．
+		*/
+		byte[] idBytes = IDA.getBytes();
+		int entlenA = idBytes.length * 8;
+		byte[] ENTLA = new byte[] { (byte) (entlenA & 0xFF00), (byte) (entlenA & 0x00FF) };
+		byte[] ZA = sm3hash(ENTLA, idBytes, a.toByteArray(), b.toByteArray(), gx.toByteArray(), gy.toByteArray(),
+				PublicKey.getX().toBigInteger().toByteArray(),
+				PublicKey.getY().toBigInteger().toByteArray());
+		return ZA;
+	}
 	private static boolean between(BigInteger param, BigInteger min, BigInteger max) {
 		if (param.compareTo(min) >= 0 && param.compareTo(max) < 0) {
 			return true;
@@ -331,6 +347,40 @@ public class SM2 {
 		
 	}
 	
+	public Signature sign(String M,String ID,SM2KeyPair keyPair) {
+		//A1:设置M_=ZA||M；
+		byte[] ZA = ZA(ID,keyPair.getPublicKey());
+		byte[] M_ = join(ZA, M.getBytes());
+		//A2:计算e=Hv(M_)，将e的数据类型转换为整数；
+		BigInteger e = new BigInteger(1, sm3hash(M_));
+		BigInteger k;
+		BigInteger r;
+		BigInteger s;
+		do {
+		do {
+		//A3:用随机数发生器产生随机数k∈[1，n一1]
+		k = randomgenerator(n);
+		//A4:计算椭圆曲线点(x1，y1)=[k]G，将x1的数据类型转换为整数
+		ECPoint p = G.multiply(k);
+		BigInteger x1 = p.getX().toBigInteger();
+		//A5:计算r=(e+x1)mod n，若r=0或r+k=n，则返回A3；
+		r = e.add(x1).mod(n);
+		}while(r.equals(BigInteger.ZERO)||r.add(k).equals(n));
+		//A6:计算s=((1+dA)^-1·(k一r·dA))mod n，若s=0，则返回A3；
+		s = ((keyPair.getPrivateKey().add(BigInteger.ONE).modInverse(n))
+				.multiply((k.subtract(r.multiply(keyPair.getPrivateKey()))).mod(n))).mod(n);
+		}while(s.equals(BigInteger.ZERO));
+		//A7:将r，s的数据类型转换为字节串，消息M的签名为(r，s)．
+		Signature signature = null;
+		//signature;
+		return signature;
+	}
+	
+	public boolean  verify(String M, Signature signature, String IDA, ECPoint aPublicKey) {
+		return false;
+		//return true;
+	}
+	
 	public static void main(String[] args) throws UnsupportedEncodingException {
 		
 		System.out.println("-----------------密钥生成-----------------");
@@ -344,15 +394,19 @@ public class SM2 {
 		System.out.println("publicKey = " + publicKey);
 		System.out.println("-----------------公钥加密-----------------");
 		
-		
 		byte[] data = sm2.encode("测试加密aaaaaaaaaaa123aabb", publicKey);
 		System.out.print("密文 = ");
 		SM2.printHexString(data);
 		System.out.println("-----------------私钥解密-----------------");
 		System.out.println("解密后明文:" + sm2.decode(data, privateKey));
 	
+		System.out.println("-----------------数字签名-----------------");
+		String ID = "Ramperlogic";
+		String M = "要签名的信息";
+		Signature signature = sm2.sign(M, ID, new SM2KeyPair(publicKey, privateKey));
+		System.out.println("用户标识:" + ID);
+		System.out.println("签名信息:" + M);
+		System.out.println("数字签名:" + signature);
+		System.out.println("验证签名:" + sm2.verify(M, signature, ID, publicKey));
 	}
-
-	
-	
 }
