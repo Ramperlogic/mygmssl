@@ -30,6 +30,9 @@
   * 添加了SM4.java文件，只有大体架构，留作项目最终阶段完善用；
   * 添加了SM4_Context.java文件。
 
+* 2020.4.4 22:30
+  * 添加了SHA256.c文件；
+  * 添加了MD5.c文件。
 ***
  Create by: Raperlogic  
  Email: 1509319438@qq.com
