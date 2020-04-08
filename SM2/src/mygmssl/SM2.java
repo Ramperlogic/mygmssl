@@ -61,16 +61,16 @@ public class SM2 {
 	
 	private static BigInteger nF2m = new BigInteger(
 			"7FFFFFFF"+"FFFFFFFF"+"FFFFFFFF"+"FFFFFFFF"+"BC972CF7"+"E6B6F900"+"945B3C6A"+"0CF6161D", 16);
-	private static BigInteger aF2m = new BigInteger(
-			"00000000" + "00000000" + "00000000" + "00000000" + "00000000" + "00000000" + "00000000" + "00000000",16);
-	private static BigInteger bF2m = new BigInteger(
-			"00"+"E78BCD09"+"746C2023"+"78A7E72B"+"12BCE002"+"66B9627E"+"CB0B5A25"+"367AD1AD"+"4CC6242B", 16);
-	private static BigInteger gxF2m = new BigInteger(
-			"00"+"CDB9CA7F"+"1E6B0441"+"F658343F"+"4B10297C"+"0EF9B649"+"1082400A"+"62E7A748"+"5735FADD", 16);
-	private static BigInteger gyF2m = new BigInteger(
-			"01"+"3DE74DA6"+"5951C4D7"+"6DC89220"+"D5F7777A"+"611B1C38"+"BAE260B1"+"75951DC8"+"060C2B3E", 16);
+	private static BigInteger aF2m = new BigInteger("0");
+	private static BigInteger bF2m = new BigInteger("00"+
+			"E78BCD09"+"746C2023"+"78A7E72B"+"12BCE002"+"66B9627E"+"CB0B5A25"+"367AD1AD"+"4CC6242B", 16);
+	private static BigInteger gxF2m = new BigInteger("00"+
+			"CDB9CA7F"+"1E6B0441"+"F658343F"+"4B10297C"+"0EF9B649"+"1082400A"+"62E7A748"+"5735FADD", 16);
+	private static BigInteger gyF2m = new BigInteger("01"+
+			"3DE74DA6"+"5951C4D7"+"6DC89220"+"D5F7777A"+"611B1C38"+"BAE260B1"+"75951DC8"+"060C2B3E", 16);
 	private static int m = 257;
 	private static int k = 12;
+	private static int token = 0;//暴力检测生成的参数是否满足要求
 	
 	public SM2() {
 		
@@ -83,11 +83,21 @@ public class SM2 {
 		{
 			G = curveFp.createPoint(gxFp, gyFp ,false);
 			ecc_bc_spec = new ECDomainParameters(curveFp, G, nFp);
+			if(debug)
+			{
+				System.out.println("G = "+G.toString());
+				System.out.println("ecc_bc_spec = "+ecc_bc_spec.toString());
+			}
 		}
 		else
-		{
+		{	
 			G = curveF2m.createPoint(gxF2m, gyF2m, false);
 			ecc_bc_spec = new ECDomainParameters(curveF2m, G, nF2m);
+			if(debug)
+			{
+				System.out.println("G = "+G.toString());
+				System.out.println("ecc_bc_spec = "+ecc_bc_spec.toString());
+			}
 		}
 			
 			
@@ -108,9 +118,9 @@ public class SM2 {
 
 			BigInteger x = publicKey.getX().toBigInteger();
 			BigInteger y = publicKey.getY().toBigInteger();
-
+			//验证公钥P的坐标xP和yP是域Fp中的元素(即验证xP和yP是区间[0; p−1]中的整数)
 			if (between(x, new BigInteger("0"), pFp) && between(y, new BigInteger("0"), pFp)) {
-				//验证公钥P的坐标xP和yP是域Fp中的元素
+				
 				BigInteger xResult = x.pow(3).add(aFp.multiply(x)).add(bFp).mod(pFp);
 				//验证yP^2≡xP^3+axP+b mod P
 				if (debug)
@@ -141,14 +151,14 @@ public class SM2 {
 				System.out.println("x = "+x);
 				System.out.println("y = "+y);
 				System.out.println("m = "+m);
-				System.out.println("xlen = "+x.toByteArray().length);
-				System.out.println("ylen = "+y.toByteArray().length);
+				System.out.println("xlen = "+publicKey.getX().toString().length());
+				System.out.println("ylen = "+publicKey.getY().toString().length());
 			}
-			//验证公钥P的坐标xP和yP是域Fp中的元素(即验证xP和yP是长度为m的比特串)
-			if (x.toByteArray().length==m && y.toByteArray().length==m) 
+			//验证公钥P的坐标xP和yP是域F2m中的元素(即验证xP和yP是长度为m的比特串)
+			if (publicKey.getX().toString().length()==m && publicKey.getY().toString().length()==m) 
 			{
 				//在F2m中验证yP^2+xPyP=xP^3+axP^2+b
-				BigInteger xResult = y.pow(2).add(x.multiply(bF2m));
+				BigInteger xResult = y.pow(2).add(x.multiply(y));
 				BigInteger yResult = x.pow(3).add(aF2m.multiply(x.pow(2))).add(bF2m);
 				if(debug)
 				{
@@ -229,14 +239,11 @@ public class SM2 {
 	private static BigInteger randomgenerator(BigInteger max) {
 		Random random = new Random();
 		BigInteger r = new BigInteger(256, random);
-		// int count = 1;
 
 		while (r.compareTo(max) >= 0) {
 			r = new BigInteger(128, random);
-			// count++;
 		}
 
-		// System.out.println("count: " + count);
 		return r;
 	}
 	private static byte[] sm3hash(byte[]... params) {
@@ -284,12 +291,12 @@ public class SM2 {
 		BigInteger d = randomgenerator(ecc_bc_spec.getN().subtract(new BigInteger("1")));
 
 		SM2KeyPair keyPair = new SM2KeyPair(G.multiply(d), d);//推测F2m在此处出了问题，生成的密钥对的publicKey中X，Y值不在F2m曲线上
-
 		if(type.equals("Fp"))
 		{
 			if (checkPublicKeyFp(keyPair.getPublicKey())) {
 				if (debug)
 					System.out.println("密钥对生成成功！");
+				token = 1;
 				return keyPair;
 			} else {
 				System.err.println("密钥对生成失败");
@@ -301,11 +308,14 @@ public class SM2 {
 			if (checkPublicKeyF2m(keyPair.getPublicKey())) {
 				if (debug)
 					System.out.println("密钥对生成成功！");
+				token = 1;
 				return keyPair;
 			} else {
 				System.err.println("密钥对生成失败");
 				return null;
 			}
+			
+			
 		}
 	}
 
@@ -313,7 +323,7 @@ public class SM2 {
 		byte[] inputBuffer = input.getBytes();
 		if(debug)
 		{
-			System.out.print("publicKey.Hex = ");
+			System.out.print("input.Hex = ");
 			printHexString(inputBuffer);
 		}
 		int klen = inputBuffer.length;//示要获得的密钥数据的位长，要求该值小于(2^32-1)*v；
@@ -731,9 +741,17 @@ public class SM2 {
 			type = sc.nextLine();
 		}
 	    while(!type.equals("Fp") && !type.equals("F2m"));	
+	    
 		System.out.println("椭圆曲线类型设置为"+type);
+		
 		SM2 sm2 = new SM2();
 		SM2KeyPair keyPair = sm2.generateKeyPair();
+		/*
+		SM2KeyPair keyPair;
+		do {
+			keyPair = sm2.generateKeyPair();
+		}while(token == 0) ;
+		*/
 		ECPoint publicKey = keyPair.getPublicKey();
 		BigInteger privateKey = keyPair.getPrivateKey();
 	
