@@ -69,8 +69,8 @@ public class SM2 {
 			"00"+"CDB9CA7F"+"1E6B0441"+"F658343F"+"4B10297C"+"0EF9B649"+"1082400A"+"62E7A748"+"5735FADD", 16);
 	private static BigInteger gyF2m = new BigInteger(
 			"01"+"3DE74DA6"+"5951C4D7"+"6DC89220"+"D5F7777A"+"611B1C38"+"BAE260B1"+"75951DC8"+"060C2B3E", 16);
-	private static int m = 193;
-	private static int k = 15;
+	private static int m = 257;
+	private static int k = 12;
 	
 	public SM2() {
 		
@@ -133,11 +133,19 @@ public class SM2 {
 		//F2m方法
 		//验证P不是无穷远
 		if(!publicKey.isInfinity()) {
-			////验证公钥P的坐标xP和yP是域Fp中的元素
+			
 			BigInteger x = publicKey.getX().toBigInteger();
 			BigInteger y = publicKey.getY().toBigInteger();
-			
-			if (x.bitLength()==m && y.bitLength()==m) 
+			if(debug)
+			{
+				System.out.println("x = "+x);
+				System.out.println("y = "+y);
+				System.out.println("m = "+m);
+				System.out.println("xlen = "+x.toByteArray().length);
+				System.out.println("ylen = "+y.toByteArray().length);
+			}
+			//验证公钥P的坐标xP和yP是域Fp中的元素(即验证xP和yP是长度为m的比特串)
+			if (x.toByteArray().length==m && y.toByteArray().length==m) 
 			{
 				//在F2m中验证yP^2+xPyP=xP^3+axP^2+b
 				BigInteger xResult = y.pow(2).add(x.multiply(bF2m));
@@ -275,7 +283,7 @@ public class SM2 {
 
 		BigInteger d = randomgenerator(ecc_bc_spec.getN().subtract(new BigInteger("1")));
 
-		SM2KeyPair keyPair = new SM2KeyPair(G.multiply(d), d);//推测F2m在此处出了问题，生成的密钥对的publicKey中X，Y值不相等
+		SM2KeyPair keyPair = new SM2KeyPair(G.multiply(d), d);//推测F2m在此处出了问题，生成的密钥对的publicKey中X，Y值不在F2m曲线上
 
 		if(type.equals("Fp"))
 		{
