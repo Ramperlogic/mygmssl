@@ -18,6 +18,7 @@ public class SM2 {
 	private static ECPoint G;
 	private static boolean debug = true;
 	private static final int DIGEST_LENGTH = 32;
+	private static int C1lenth;
 	/*
 	 * ECCurve.Fp
 	 *	public ECCurve.Fp(java.math.BigInteger q,
@@ -118,6 +119,11 @@ public class SM2 {
 
 			BigInteger x = publicKey.getX().toBigInteger();
 			BigInteger y = publicKey.getY().toBigInteger();
+			if(debug)
+			{
+				System.out.println("x = "+x);
+				System.out.println("y = "+y);
+			}
 			//验证公钥P的坐标xP和yP是域Fp中的元素(即验证xP和yP是区间[0; p−1]中的整数)
 			if (between(x, new BigInteger("0"), pFp) && between(y, new BigInteger("0"), pFp)) {
 				
@@ -175,7 +181,7 @@ public class SM2 {
 			}
 			
 		}
-			return false;
+			return true;
 	}
 	private static byte[] ZA(String IDA, ECPoint PublicKey) {
 		/*
@@ -288,7 +294,7 @@ public class SM2 {
 	}
 	public SM2KeyPair generateKeyPair() {
 
-		BigInteger d = randomgenerator(ecc_bc_spec.getN().subtract(new BigInteger("1")));
+		BigInteger d = randomgenerator(ecc_bc_spec.getN().subtract(new BigInteger("2")));
 
 		SM2KeyPair keyPair = new SM2KeyPair(G.multiply(d), d);//推测F2m在此处出了问题，生成的密钥对的publicKey中X，Y值不在F2m曲线上
 		if(type.equals("Fp"))
@@ -391,7 +397,7 @@ public class SM2 {
 		}
     	//A8:输出密文C=C1||C3||C2．
 		byte[] encodeResult = new byte[C1Buffer.length + C2.length + C3.length];
-
+		C1lenth = C1Buffer.length;
 		System.arraycopy(C1Buffer, 0, encodeResult, 0, C1Buffer.length);
 		System.arraycopy(C2, 0, encodeResult, C1Buffer.length, C2.length);
 		System.arraycopy(C3, 0, encodeResult, C1Buffer.length + C2.length, C3.length);
@@ -437,7 +443,7 @@ public class SM2 {
 		
 		
 		//B4:计算t=KDF(x2||y2,klen)，若t为全0比特串，则报错并退出；
-		int klen = encodeData.length - 65 - DIGEST_LENGTH;
+		int klen = encodeData.length - C1lenth - DIGEST_LENGTH;
 		byte[] t = KDF(dBC1Bytes, klen);
 		if(debug)
 		{
@@ -448,7 +454,7 @@ public class SM2 {
 		//B5:从C中取出比特串C2，计算M'=C2⊕t；
 		byte[] M = new byte[klen];
 		byte[] C2 = new byte[30];
-		System.arraycopy(encodeData, 65, C2, 0, klen);
+		System.arraycopy(encodeData, C1lenth, C2, 0, klen);
 		for (int i = 0; i < M.length; i++) {
 			M[i] = (byte) ( C2[i]^ t[i]);//encodeData[C1Byte.length + i]
 		}
@@ -732,7 +738,6 @@ public class SM2 {
 		}
 	}
 	public static void main(String[] args) throws UnsupportedEncodingException {
-		
 		System.out.println("-----------------密钥生成-----------------");
 		 // 用户自己主私钥,用户自己设置
 		Scanner sc = new Scanner(System.in); 
@@ -745,13 +750,13 @@ public class SM2 {
 		System.out.println("椭圆曲线类型设置为"+type);
 		
 		SM2 sm2 = new SM2();
-		SM2KeyPair keyPair = sm2.generateKeyPair();
-		/*
+		//SM2KeyPair keyPair = sm2.generateKeyPair();
+		
 		SM2KeyPair keyPair;
 		do {
 			keyPair = sm2.generateKeyPair();
 		}while(token == 0) ;
-		*/
+		
 		ECPoint publicKey = keyPair.getPublicKey();
 		BigInteger privateKey = keyPair.getPrivateKey();
 	
