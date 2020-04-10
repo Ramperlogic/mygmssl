@@ -151,11 +151,11 @@ public class SM2 {
 				System.out.println("x = "+x);
 				System.out.println("y = "+y);
 				System.out.println("m = "+m);
-				System.out.println("xlen = "+publicKey.getX().toString().length());
-				System.out.println("ylen = "+publicKey.getY().toString().length());
+				System.out.println("xlen = "+publicKey.getX().getFieldSize());
+				System.out.println("ylen = "+publicKey.getY().getFieldSize());
 			}
 			//验证公钥P的坐标xP和yP是域F2m中的元素(即验证xP和yP是长度为m的比特串)
-			if (publicKey.getX().toString().length()==m && publicKey.getY().toString().length()==m) 
+			if (publicKey.getX().getFieldSize()==m && publicKey.getY().getFieldSize()==m) 
 			{
 				//在F2m中验证yP^2+xPyP=xP^3+axP^2+b
 				BigInteger xResult = y.pow(2).add(x.multiply(y));
